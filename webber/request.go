@@ -10,7 +10,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// BasicRequest wraps the http request with any route param assosiated with the request
+// BasicRequest wraps the http request with any route param associated with the request
 type BasicRequest struct {
 	httpRequest *http.Request
 	pathParams  map[string]string

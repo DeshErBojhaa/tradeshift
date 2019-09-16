@@ -1,6 +1,6 @@
 // Package graph is inmemory representation for company hierarchy. All read requests
 // are served from this package. It's consumers responsibility to update this package
-// after any write call to persistant layer.
+// after any write call to persistent layer.
 package graph
 
 import (
@@ -24,7 +24,7 @@ type Node struct {
 	Children map[string]*Node
 }
 
-// Graph is in memory representation of hierarcy.
+// Graph is in memory representation of hierarchy.
 type Graph struct {
 	Root  *Node
 	Nodes map[string]*Node

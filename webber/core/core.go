@@ -2,6 +2,7 @@ package core
 
 import "net/http"
 
+// Package level constants
 const (
 	HeaderContentType         = "Content-Type"
 	HeaderXContentTypeOptions = "X-Content-Type-Options"

@@ -48,7 +48,7 @@ func (m *MySQL) InsertNode(node *graph.Node) error {
 	if err != nil {
 		return err
 	}
-	// Will not be called if commited prior
+	// Will not be called if committed prior
 	defer tx.Rollback()
 
 	stmtNode, err := tx.Prepare("INSERT INTO nodes (Id, ParId, Height) VALUES (?, ?, ?)")

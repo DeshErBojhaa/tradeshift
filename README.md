@@ -1,6 +1,7 @@
 # tradeshift
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Build Status](https://travis-ci.com/DeshErBojhaa/tradeshift.svg?branch=master)](https://travis-ci.com/DeshErBojhaa/tradeshift)
+[![Go Report Card](https://goreportcard.com/badge/github.com/DeshErBojhaa/tradeshift)](https://goreportcard.com/report/github.com/DeshErBojhaa/tradeshift)
 
 ## How to run
 1. Build with `$ CGO_ENABLED=0 GOOS=linux GOARCH=386 go build -a -installsuffix cgo -ldflags '-s' -o appbinary`

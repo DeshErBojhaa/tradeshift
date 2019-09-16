@@ -42,7 +42,7 @@ func (c Controller) GetChildren(req core.Request) core.ResponseWriter {
 }
 
 // UpdateParent changes parent of a given node. First chenge the underlying
-// persistance storage. If that succeeds, update the in memory cache.
+// persistence storage. If that succeeds, update the in memory cache.
 func (c Controller) UpdateParent(req core.Request) core.ResponseWriter {
 	id, ok := req.PathParam(pathParamID)
 	if !ok {
