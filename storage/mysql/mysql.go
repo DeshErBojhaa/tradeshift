@@ -18,16 +18,13 @@ type MySQL struct {
 // CreateSchema bootstraps the initial database schema.
 func (m *MySQL) CreateSchema() {
 	log.Println("Creating schema fot tradeshift")
-
-	m.session.Exec("DROP TABLE nodes")
-	m.session.Exec("DROP TABLE parents")
-	m.session.Exec("CREATE TABLE nodes (Id varchar(20), ParId varchar(20), Height int)")
-	m.session.Exec("CREATE TABLE parents (Id varchar(20), ParId varchar(20))")
+	m.session.Exec(`CREATE DATABASE IF NOT EXISTS tradeshift DEFAULT CHARACTER SET = 'utf8' DEFAULT COLLATE 'utf8_general_ci';`)
+	m.session.Exec(`USE tradeshift;`)
+	m.session.Exec("CREATE TABLE IF NOT EXISTS nodes (Id varchar(20), ParId varchar(20) NULL, Height int)")
 }
 
 // NewMySQLStore creates an instance of MySQLStore with the given connection string.
 func NewMySQLStore(connection string) (*MySQL, error) {
-	log.Println("Opening connection to:", connection)
 	db, err := sql.Open("mysql", connection)
 	if err != nil {
 		return nil, err
@@ -39,8 +36,9 @@ func NewMySQLStore(connection string) (*MySQL, error) {
 		return nil, err
 	}
 
-	// TODO: Create schema if does not exists
-	return &MySQL{session: db}, nil
+	session := &MySQL{session: db}
+	session.CreateSchema()
+	return session, nil
 }
 
 // InsertNode creates a graph node with it's parent child relationship into the datastore.
@@ -59,16 +57,8 @@ func (m *MySQL) InsertNode(node *graph.Node) error {
 	}
 	defer stmtNode.Close()
 
-	stmtPar, err := tx.Prepare("INSERT INTO parents (Id, ParId) VALUES (?, ?)")
-	if err != nil {
-		return err
-	}
-	defer stmtPar.Close()
-
 	if _, err := stmtNode.Exec(node.ID, node.ParID, node.Height); err != nil {
-		return err
-	}
-	if _, err := stmtPar.Exec(node.ID, node.ParID); err != nil {
+		log.Printf("error happened executing node %#v", err)
 		return err
 	}
 
@@ -83,7 +73,6 @@ func (m *MySQL) InsertNode(node *graph.Node) error {
 func (m *MySQL) GetNodes() ([]*graph.Node, error) {
 	nodes := make([]*graph.Node, 0)
 	nodeMap := make(map[string]*graph.Node)
-	childs := make(map[string][]string)
 
 	rows, err := m.session.Query("SELECT Id, ParId, Height FROM nodes")
 	if err != nil {
@@ -92,7 +81,7 @@ func (m *MySQL) GetNodes() ([]*graph.Node, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		node := graph.Node{}
+		node := graph.NewEmptyNode()
 		rows.Scan(&node.ID, &node.ParID, &node.Height)
 		nodes = append(nodes, &node)
 		nodeMap[node.ID] = &node
@@ -102,25 +91,12 @@ func (m *MySQL) GetNodes() ([]*graph.Node, error) {
 		return nil, err
 	}
 
-	rows, err = m.session.Query("SELECT Id, ParId FROM parents")
-	if err != nil {
-		return nil, err
-	}
-
-	for rows.Next() {
-		var parentID, childID string
-		rows.Scan(&childID, &parentID)
-		childs[parentID] = append(childs[parentID], childID)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
 	for _, node := range nodes {
-		childrenID := childs[node.ID]
-		for _, cID := range childrenID {
-			node.Children[cID] = nodeMap[cID]
+		parNode := nodeMap[node.ParID]
+		if parNode == nil { // Root
+			continue
 		}
+		parNode.Children[node.ID] = node
 	}
 
 	return nodes, nil
@@ -139,23 +115,26 @@ func (m *MySQL) UpdateParent(curNode, targetNode *graph.Node) error {
 	}
 	defer tx.Rollback()
 
-	stmtUpdatePar, err := tx.Prepare("UPDATE nodes SET ParId=? WHERE id=?")
+	// 1. All children of cur node should now be direct children of cur nodes parent (Move 1 level up)
+	// 2. Cur node's parent will change
+
+	// 1
+	stmtLevelUpChildren, err := tx.Prepare("UPDATE nodes SET ParId=?, Height=Height-1 WHERE ParId=?")
+	if err != nil {
+		return err
+	}
+	defer stmtLevelUpChildren.Close()
+	if _, err := stmtLevelUpChildren.Exec(curNode.ParID, curNode.ID); err != nil {
+		return err
+	}
+
+	// 2
+	stmtUpdatePar, err := tx.Prepare("UPDATE nodes SET ParId=?, Height=? WHERE Id=?")
 	if err != nil {
 		return err
 	}
 	defer stmtUpdatePar.Close()
-
-	stmtUpdateRelation, err := tx.Prepare("UPDATE parents SET ParId=? WHERE id=? AND ParId=?")
-	if err != nil {
-		return err
-	}
-	defer stmtUpdateRelation.Close()
-
-	if _, err := stmtUpdatePar.Exec(targetNode.ID, curNode.ID); err != nil {
-		return err
-	}
-
-	if _, err := stmtUpdateRelation.Exec(targetNode.ID, curNode.ID, curNode.ParID); err != nil {
+	if _, err := stmtUpdatePar.Exec(targetNode.ID, targetNode.Height+1, curNode.ID); err != nil {
 		return err
 	}
 	return tx.Commit()

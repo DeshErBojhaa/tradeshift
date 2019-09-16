@@ -14,7 +14,10 @@ func main() {
 		FieldNameTag: "json",
 	})
 
-	if err := api.Serve("8080", os.Getenv("MYSQL_CONN"), v); err != nil {
+	if err := api.Serve(":8080", os.Getenv("MYSQL_CONN"), v); err != nil {
 		log.Fatal(err)
 	}
 }
+
+// $ CGO_ENABLED=0 GOOS=linux GOARCH=386 go build -a -installsuffix cgo -ldflags '-s' -o tradeshift
+// Build with ^. This creats a static binary

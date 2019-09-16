@@ -1,0 +1,10 @@
+version: '2.1'
+
+services:
+  tradeshift:
+    image: tradeshift
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 8080:8080

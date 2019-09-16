@@ -16,6 +16,8 @@ func Serve(listenAddress, connString string, v *validator.Validate) error {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// Smell!! Sending the db to graph package, and initing grapg from there breaks gopls.
 	nodes, err := db.GetNodes()
 	if err != nil {
 		log.Fatal(err)
@@ -32,8 +34,8 @@ func Serve(listenAddress, connString string, v *validator.Validate) error {
 	}
 
 	s := webber.NewServer(listenAddress, core.MediaTypeJSON)
-	s.POST("/node", controller.Create)
-	s.UPDATE("/{id}?par={parid}", controller.UpdateParent)
+	s.POST("/node/create", controller.Create)
+	s.PUT("/node/{id}/make_parent/{parid}", controller.UpdateParent)
 	s.GET("/children/{id}", controller.GetChildren)
 
 	return s.Serve()

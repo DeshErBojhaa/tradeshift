@@ -1,11 +1,12 @@
+// Package graph is inmemory representation for company hierarchy. All read requests
+// are served from this package. It's consumers responsibility to update this package
+// after any write call to persistant layer.
 package graph
 
 import (
 	"errors"
 	"fmt"
 )
-
-// TODO: Cover tests
 
 // ErrDuplicateID triggers when given id already exists
 var ErrDuplicateID = errors.New("id alreary exists")
@@ -17,74 +18,60 @@ var ErrInvalidParentID = errors.New("parent not found")
 // the unique identifier for each node. Which is not the best
 // practice, but will serve the given problem sufficiently.
 type Node struct {
-	ID       string // Unique
-	ParID    string
+	ID       string `json:"id"`
+	ParID    string `json:"pid"`
+	Height   int    `json:"height"`
 	Children map[string]*Node
-	Height   int
 }
 
 // Graph is in memory representation of hierarcy.
 type Graph struct {
-	UpdateDB bool
-	Root     *Node
-	Nodes    map[string]*Node
+	Root  *Node
+	Nodes map[string]*Node
 }
 
 // Initialize creates a new graph object
 func Initialize(nodes []*Node) (*Graph, error) {
 	nodeMap := make(map[string]*Node)
-	root := &Node{}
-
+	g := Graph{}
 	for _, node := range nodes {
 		nodeMap[node.ID] = node
 		if node.ParID == "" {
-			root = node
+			g.Root = node
 		}
 	}
-	return &Graph{
-		Root:  root,
-		Nodes: nodeMap,
-	}, nil
+	g.Nodes = nodeMap
+	return &g, nil
 }
 
-var hiararchy Graph
-
-func init() {
-	// Make it from the database
-	hiararchy = Graph{
-		UpdateDB: false,
-		Root:     nil,
-		Nodes:    make(map[string]*Node),
-	}
+// NewEmptyNode ...
+func NewEmptyNode() Node {
+	return Node{Children: make(map[string]*Node), Height: 0}
 }
 
-// CreateNode creates a new in memory node. Make it persist in the database
-func (g *Graph) CreateNode(id, parent string) (*Node, error) {
-	if _, ok := g.Nodes[id]; ok {
-		return nil, ErrDuplicateID
+// EmplaceNode emplaces the given node into the graph. Updates the parent child relationship.
+func (g *Graph) EmplaceNode(node *Node) error {
+	if _, ok := g.Nodes[node.ID]; ok {
+		return ErrDuplicateID
 	}
 
-	parNode, ok := g.Nodes[parent]
-	if !ok {
-		return nil, ErrInvalidParentID
+	parNode, ok := g.Nodes[node.ParID]
+	if !ok && g.Root != nil {
+		return ErrInvalidParentID
 	}
-
-	newNode := &Node{
-		ID:       id,
-		ParID:    parent,
-		Children: make(map[string]*Node),
+	if g.Root == nil {
+		g.Root = node
 	}
-	// Update the graph
-	parNode.Children[id] = newNode
-
-	// Update the persistance
-	// err := db.AddNewNode(parNode, newNode)  // Node pathaye update korbo, naki valu gula pathaye node return koerbo??
-	return newNode, nil
+	g.Nodes[node.ID] = node
+	if parNode != nil {
+		parNode.Children[node.ID] = node
+	}
+	return nil
 }
 
 // UpdateParent sets the parent to parameter 'newPar'
 func (g *Graph) UpdateParent(id, newPar string) error {
-	var curNode, parNode *Node
+	var curNode, newParNode *Node
 	var ok bool
 	if curNode, ok = g.Nodes[id]; !ok {
 		return fmt.Errorf("invalid id %s", id)
@@ -93,26 +80,37 @@ func (g *Graph) UpdateParent(id, newPar string) error {
 		return fmt.Errorf("can not update parent of the root")
 	}
 
-	if parNode, ok = g.Nodes[newPar]; !ok {
+	if newParNode, ok = g.Nodes[newPar]; !ok {
 		return fmt.Errorf("invalid parent id")
 	}
-	// Remove reference from the old parent
-	prevPar := g.Nodes[curNode.ParID]
-	delete(prevPar.Children, id)
-	// Add reference to the new parent
-	parNode.Children[id] = curNode
+	prevParNode := g.Nodes[curNode.ParID]
 
-	// Update persistance
+	// 1. Move children of cur node one level up
+	for _, node := range curNode.Children {
+		node.Height--
+		node.ParID = prevParNode.ID
+		prevParNode.Children[node.ID] = node
+	}
 
+	// 2. Remove all childs of cur node
+	curNode.Children = make(map[string]*Node)
+
+	// 3. Remove cur node from it's prev parent
+	delete(prevParNode.Children, id)
+
+	// 4. Add cur node to it's new parent
+	newParNode.Children[id] = curNode
+
+	// 5. Set cur nodes parent to right value. Update height
+	curNode.ParID = newPar
+	curNode.Height = newParNode.Height + 1
 	return nil
 }
 
 // GetChildren returns all the childrens of a given node
 func (g *Graph) GetChildren(id string) ([]*Node, error) {
-	var curNode *Node
-	var ok bool
-
-	if curNode, ok = g.Nodes[id]; !ok {
+	curNode, ok := g.Nodes[id]
+	if !ok {
 		return nil, fmt.Errorf("invalid id %s", id)
 	}
 	children := make([]*Node, len(curNode.Children))
@@ -123,6 +121,3 @@ func (g *Graph) GetChildren(id string) ([]*Node, error) {
 	}
 	return children, nil
 }
-
-// $ CGO_ENABLED=0 GOOS=linux GOARCH=386 go build -a -installsuffix cgo -ldflags '-s' -o server
-// Build with ^. This creats a static binary

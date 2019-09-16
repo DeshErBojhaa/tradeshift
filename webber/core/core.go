@@ -9,13 +9,16 @@ const (
 	MediaTypeJSON             = "application/json"
 	MethodGet                 = "GET"
 	MethodPost                = "POST"
-	MethodUpdate              = "UPDATE"
+	MethodUpdate              = "PUT"
 )
 
+// ResponseWriter ...
 type ResponseWriter func(w http.ResponseWriter)
 
+// Handler ...
 type Handler func(r Request) ResponseWriter
 
+// Request ...
 type Request interface {
 	PathParam(key string) (string, bool)
 	JSON(target interface{}) error

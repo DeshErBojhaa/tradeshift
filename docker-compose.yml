@@ -1,0 +1,35 @@
+version: '3.1'
+services:
+  db-msq:
+    image: mysql
+    ports:
+      - 3306:3306
+    expose:
+      - '3306'
+    environment:
+      MYSQL_DATABASE: 'tradeshift'
+      # MYSQL_USER: 'root'
+      MYSQL_PASSWORD: 'pass'
+      MYSQL_ROOT_PASSWORD: 'pass'
+
+  api:
+    image: mvp
+    build: .
+    ports:
+      - 8080:8080
+    expose:
+      - '8080'
+    depends_on:
+      - db-msq
+    environment:
+      MYSQL_CONN: root:pass@tcp(db-msq:3306)/tradeshift
+      DUMMY_IP: db-msq
+    command: >
+      /bin/bash -c "
+        while ! nc -z db-msq 3306;
+        do
+          echo sleeping;
+          sleep 1;
+        done;
+        echo Connected!;
+      "

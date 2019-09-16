@@ -42,8 +42,8 @@ func (s *Server) POST(path string, h core.Handler) {
 	s.register(path, h, core.MethodPost)
 }
 
-// UPDATE ...
-func (s *Server) UPDATE(path string, h core.Handler) {
+// PUT changes the parent of a given node
+func (s *Server) PUT(path string, h core.Handler) {
 	s.register(path, h, core.MethodUpdate)
 }
 

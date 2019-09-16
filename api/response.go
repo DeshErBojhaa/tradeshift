@@ -63,7 +63,7 @@ func (r *Response) marshal() []byte {
 	switch r.mediaType {
 	case core.MediaTypeJSON:
 		body = r.marshalJSON()
-	default:
+	default: // Meh
 		panic("unsupported media type: " + r.mediaType)
 	}
 
